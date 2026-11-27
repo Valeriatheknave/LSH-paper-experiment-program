@@ -13,7 +13,7 @@
 #include <random>
 #include <stdexcept>
 
-namespace dblsh2 {
+namespace dblsh_im {
 namespace {
 
 constexpr float kInf = std::numeric_limits<float>::infinity();
@@ -50,7 +50,7 @@ bool load_ground_truth(const Options& options, const Dataset& dataset, int k,
     in.read(reinterpret_cast<char*>(&stored_k), sizeof(stored_k));
     in.read(reinterpret_cast<char*>(&n), sizeof(n));
     in.read(reinterpret_cast<char*>(&dim), sizeof(dim));
-    if (std::strncmp(magic, "DBLSH2GT001", sizeof(magic)) != 0 ||
+    if (std::strncmp(magic, "DBLSHIMGT01", sizeof(magic)) != 0 ||
         fingerprint != dataset_fingerprint(options, dataset) ||
         q != dataset.eval_count || stored_k != k || n != dataset.n ||
         dim != dataset.dim) {
@@ -75,7 +75,7 @@ void save_ground_truth(const Options& options, const Dataset& dataset, int k,
     const uint64_t fingerprint = dataset_fingerprint(options, dataset);
     const int32_t q = dataset.eval_count, stored_k = k;
     const int32_t n = dataset.n, dim = dataset.dim;
-    out.write("DBLSH2GT001", 12);
+    out.write("DBLSHIMGT01", 12);
     out.write(reinterpret_cast<const char*>(&fingerprint), sizeof(fingerprint));
     out.write(reinterpret_cast<const char*>(&q), sizeof(q));
     out.write(reinterpret_cast<const char*>(&stored_k), sizeof(stored_k));
@@ -533,8 +533,6 @@ BenchmarkReport run_benchmark(const Dataset& dataset, const LSHIndex& index,
     }
 
     std::vector<ThreadStats> stats(threads);
-    std::vector<std::vector<Result>> all_results(q);
-
     const double start = omp_get_wtime();
 
     #pragma omp parallel num_threads(threads)
@@ -549,41 +547,34 @@ BenchmarkReport run_benchmark(const Dataset& dataset, const LSHIndex& index,
             index.query(dataset.query(qi), k, options.beta, options.c,
                         options.r_min, scratch, results, detail);
 
-            all_results[qi] = results;
-
             stats[tid].visited += detail.visited;
             stats[tid].rounds += detail.rounds;
             stats[tid].returned += static_cast<long long>(results.size());
             stats[tid].nodes += detail.nodes;
             stats[tid].window_hits += detail.hits;
             stats[tid].early += detail.early;
+
+            if (options.compute_gt) {
+                // Recall is a set intersection over the top-k ids, exactly as
+                // in the reference implementation (ties may reorder the list).
+                const auto gt_begin = gt_ids.begin() + static_cast<size_t>(qi) * k;
+                const auto gt_end = gt_begin + k;
+                for (size_t j = 0; j < results.size(); ++j) {
+                    if (std::find(gt_begin, gt_end, results[j].id) != gt_end) {
+                        ++stats[tid].exact_hits;
+                    }
+                    const size_t pos = static_cast<size_t>(qi) * k + j;
+                    const float reference = gt_dist[pos];
+                    const float ratio = reference > 0.0f
+                                            ? results[j].dist / reference
+                                            : 1.0f;
+                    stats[tid].ratio_sum += ratio;
+                }
+            }
         }
     }
 
     report.query_wall_ms = (omp_get_wtime() - start) * 1000.0;
-
-    // Ground-truth evaluation is deliberately outside the timed query interval.
-    if (options.compute_gt) {
-        for (int qi = 0; qi < q; ++qi) {
-            const auto gt_begin = gt_ids.begin() + static_cast<size_t>(qi) * k;
-            const auto gt_end = gt_begin + k;
-
-            for (size_t j = 0; j < all_results[qi].size(); ++j) {
-                const Result& result = all_results[qi][j];
-
-                if (std::find(gt_begin, gt_end, result.id) != gt_end) {
-                    ++stats[0].exact_hits;
-                }
-
-                const size_t pos = static_cast<size_t>(qi) * k + j;
-                const float reference = gt_dist[pos];
-                const float ratio = reference > 0.0f
-                                        ? result.dist / reference
-                                        : 1.0f;
-                stats[0].ratio_sum += ratio;
-            }
-        }
-    }
 
     long long visited = 0, rounds = 0, returned = 0, hits = 0;
     long long nodes = 0, window_hits = 0, early = 0;
@@ -598,7 +589,6 @@ BenchmarkReport run_benchmark(const Dataset& dataset, const LSHIndex& index,
         window_hits += s.window_hits;
         early += s.early;
     }
-
     report.nodes = static_cast<double>(nodes) / q;
     report.hits = static_cast<double>(window_hits) / q;
     report.early = static_cast<double>(early) / q;
@@ -606,13 +596,11 @@ BenchmarkReport run_benchmark(const Dataset& dataset, const LSHIndex& index,
                   std::max<long long>(1, static_cast<long long>(q) * dataset.n);
     report.rounds = static_cast<double>(rounds) / q;
     report.verified = static_cast<double>(visited) / q;
-
     if (options.compute_gt) {
         report.recall = static_cast<double>(hits) /
                         std::max<long long>(1, static_cast<long long>(q) * k);
         report.ratio = ratio_sum / std::max<long long>(1, returned);
     }
-
     return report;
 }
 
@@ -668,4 +656,4 @@ void print_report(const Options& options, const BenchmarkReport& report) {
     }
 }
 
-}  // namespace dblsh2
+}  // namespace dblsh_im

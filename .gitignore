@@ -2,11 +2,13 @@
 *.o
 dblsh_im
 
-# Ground-truth cache
+# Datasets (large binary inputs, see README)
+data/
+*.data_new
+
+# Run outputs
+results/
 *.gt
 
-# Benchmark output
-results/
-
-# Datasets (large binary input files)
-data/
+# Editor / IDE
+.vscode/
