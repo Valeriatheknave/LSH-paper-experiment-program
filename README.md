@@ -8,7 +8,7 @@ It accompanies the paper:
 
 DB-LSH-IM follows the original hashing and query-based dynamic-bucketing approach while replacing the disk-backed R\*-tree index with bulk-loaded in-memory kd-trees and introducing other implementation optimizations.
 
-> **Scope:** This is an engineering reimplementation, **not** a new LSH algorithm, and it is **not** the official *DB-LSH 2.0* extension (Tian, Zhao, and Zhou; TKDE 2023/2024 [42]). Differences in data structures and traversal order can affect the candidates examined and the results returned. The measurements below characterize the reimplementation as a whole; they do not isolate individual optimizations or establish algorithm-level speedups.
+> **Scope:** This is an engineering reimplementation, **not** a new LSH algorithm, and it is **not** the official *DB-LSH 2.0* extension (Tian, Zhao, and Zhou; TKDE 2024 [42]). Differences in data structures and traversal order can affect the candidates examined and the results returned. The measurements below characterize the reimplementation as a whole; they do not isolate individual optimizations or establish algorithm-level speedups.
 
 ## Approach
 
@@ -36,7 +36,7 @@ The implementations follow the same general approach, but the use of different d
 - **Early distance termination:** stop calculating a candidate's distance when its partial squared distance cannot improve the current top-k.
 - **Traversal ordering:** visit the more promising child first in projected space.
 - **Ground-truth cache:** reuse exact nearest-neighbor results across runs when the cache is valid.
-- **Wall-clock timing:** use `omp_get_wtime()` for DB-LSH-IM measurements.
+- **Wall-clock timing:** use `omp_get_wtime()` for DB-LSH-IM measurements; both implementations were measured using wall-clock time.
 
 The in-memory index trades disk usage for RAM. Datasets that can be processed using a disk-backed index may not fit in memory with this implementation.
 
@@ -54,7 +54,7 @@ For Audio and MNIST, the first 200 vectors in each input file are reserved as qu
 
 ## Experimental configuration
 
-The experiment was conducted on an Intel Core i5-8250U system with 19 GiB of RAM running Ubuntu Linux, using one thread. Each implementation–dataset configuration was repeated 20 times.
+The experiment was conducted on an Acer TravelMate P214-51 laptop equipped with an Intel Core i5-8250U processor and running Ubuntu 24.04.5 LTS. Both implementations were evaluated using a single thread. Each implementation–dataset configuration was repeated 20 times, resulting in 120 total benchmark runs.
 
 | Parameter | Description | Value |
 |---|---|---|
@@ -66,55 +66,79 @@ The experiment was conducted on an Intel Core i5-8250U system with 19 GiB of RAM
 | `Q` | Evaluated queries | 100 |
 | Seed | DB-LSH-IM projection seed | 0 |
 | `R_min` | Initial-radius parameter | Audio 0.3; MNIST 500; SIFT 1.0 |
+| `leaf_size` | kd-tree leaf size | 128 |
 
 Parameters were fixed rather than swept; results characterize the selected configurations rather than optimized performance across all configurations.
 
 ## Results
 
-### Table 1 — Performance comparison
+### Table 1 — Indexing and query performance
 
-| Dataset | Implementation | Indexing time (s) | Query time (ms/query) | Recall@50 | Distance ratio |
+Values are mean ± standard deviation over 20 repetitions. Indexing time is in seconds; query time is in milliseconds per query.
+
+| Dataset | Implementation | Indexing time (s) | Query time (ms/query) |
+|---|---|---:|---:|
+| Audio | Original DB-LSH | 0.24752 ± 0.01038 | 3.48453 ± 0.12277 |
+| Audio | DB-LSH-IM | **0.05605 ± 0.00734** | **2.59550 ± 0.12298** |
+| MNIST | Original DB-LSH | 0.61995 ± 0.01417 | 6.89610 ± 0.12144 |
+| MNIST | DB-LSH-IM | **0.15807 ± 0.01159** | **6.13086 ± 0.21808** |
+| SIFT 100k | Original DB-LSH | 0.45899 ± 0.01567 | 9.84344 ± 0.23579 |
+| SIFT 100k | DB-LSH-IM | **0.10742 ± 0.00517** | **5.70514 ± 0.18600** |
+
+Bold indicates the better measured value. Lower times are desirable.
+
+### Table 2 — Search quality and search-effort measures
+
+Values are means across 20 runs. These metrics were invariant across repetitions in the recorded experiment.
+
+| Dataset | Implementation | Recall | Ratio | Cost | Rounds |
 |---|---|---:|---:|---:|---:|
-| Audio | Original | 0.240104 | 3.434614 | 0.9106 | 1.003950 |
-| Audio | DB-LSH-IM | **0.062958** | **2.318740** | **0.9186** | **1.003777** |
-| MNIST | Original | 0.623759 | 6.757688 | 0.9250 | 1.003920 |
-| MNIST | DB-LSH-IM | **0.217501** | **5.646030** | **0.9316** | **1.003690** |
-| SIFT 100k | Original | 0.455335 | 9.878633 | 0.9078 | 1.003650 |
-| SIFT 100k | DB-LSH-IM | **0.119412** | **5.181170** | **0.9138** | **1.003414** |
+| Audio | Original DB-LSH | 0.9106 | 1.003950 | 0.100910 | 1.66 |
+| Audio | DB-LSH-IM | **0.9186** | **1.003777** | 0.100928 | 1.66 |
+| MNIST | Original DB-LSH | 0.9250 | 1.003920 | 0.100836 | 1.74 |
+| MNIST | DB-LSH-IM | **0.9316** | **1.003690** | 0.100836 | 1.74 |
+| SIFT 100k | Original DB-LSH | 0.9078 | 1.003650 | 0.100500 | 12.98 |
+| SIFT 100k | DB-LSH-IM | **0.9138** | **1.003414** | 0.100500 | 12.98 |
 
-Bold indicates the better measured value within each dataset. Lower indexing time, query time, and ratio are desirable; higher recall is desirable.
+### Table 3 — Relative timing improvements
 
-### Table 2 — Relative performance of DB-LSH-IM
+Calculated using the mean timing of Original DB-LSH as the baseline.
 
-| Dataset | Recall improvement | Query reduction | Query speedup | Indexing reduction | Indexing speedup |
-|---|---:|---:|---:|---:|---:|
-| Audio | +0.0080 | 32.42% | 1.4827× | 73.74% | 3.8242× |
-| MNIST | +0.0066 | 16.42% | 1.1976× | 65.09% | 2.8703× |
-| SIFT 100k | +0.0060 | 47.54% | 1.9083× | 73.75% | 3.8203× |
+| Dataset | Indexing reduction | Query-time reduction |
+|---|---:|---:|
+| Audio | 77.36% | 25.51% |
+| MNIST | 74.50% | 11.10% |
+| SIFT 100k | 76.60% | 42.04% |
 
-### Table 3 — Paired statistical analysis of timing
+Reduction (%) = (T<sub>Original</sub> − T<sub>IM</sub>) / T<sub>Original</sub> × 100. These percentages are descriptive improvements in the observed mean timings.
 
-| Dataset | Metric | Speedup | 95% Bootstrap CI | Bonferroni-adjusted p-value |
+### Table 4 — Paired statistical comparison
+
+The statistical analysis compares the corresponding 20 repetitions for each dataset and metric.
+
+| Dataset | Metric | Mean paired difference* | 95% bootstrap CI | Adjusted p |
 |---|---|---:|---|---|
-| Audio | Indexing | 3.8242× | [3.7149, 3.9288] | 1.1444 × 10⁻⁵ |
-| Audio | Query | 1.4827× | [1.4551, 1.5138] | 1.1444 × 10⁻⁵ |
-| MNIST | Indexing | 2.8703× | [2.8143, 2.9299] | 1.1444 × 10⁻⁵ |
-| MNIST | Query | 1.1976× | [1.1814, 1.2139] | 1.1444 × 10⁻⁵ |
-| SIFT 100k | Indexing | 3.8203× | [3.7333, 3.9068] | 1.1444 × 10⁻⁵ |
-| SIFT 100k | Query | 1.9083× | [1.8809, 1.9348] | 1.1444 × 10⁻⁵ |
+| Audio | Indexing | 0.191473 s | [0.186243, 0.196731] | 0.00001144 |
+| Audio | Query | 0.889031 ms | [0.812288, 0.960477] | 0.00001144 |
+| MNIST | Indexing | 0.461885 s | [0.453226, 0.470227] | 0.00001144 |
+| MNIST | Query | 0.765239 ms | [0.666209, 0.869227] | 0.00001144 |
+| SIFT 100k | Indexing | 0.351569 s | [0.344363, 0.358964] | 0.00001144 |
+| SIFT 100k | Query | 4.138300 ms | [4.018101, 4.269807] | 0.00001144 |
 
-Every adjusted p-value is below the 0.05 level, and none of the confidence intervals includes 1.
+\*Difference = Original DB-LSH time − DB-LSH-IM time. Positive values favor DB-LSH-IM. CI is for the paired mean difference. Test: Wilcoxon signed-rank test, paired, exact. W⁺ = 210, W⁻ = 0 in all comparisons. Unadjusted p = 1.907 × 10⁻⁶; Bonferroni-adjusted p = 1.144 × 10⁻⁵. All six comparisons are statistically significant after Bonferroni correction.
 
 ### Timing caveats
 
 The measurements characterize DB-LSH-IM as a whole, not any single implementation change. Because individual optimizations were not isolated, the lower recorded indexing and query times cannot be attributed specifically to the in-memory kd-tree index, the contiguous projections, the early distance termination, the bounded top-k heap, or the de-duplication scheme.
 
-Timing interpretation is subject to two measurement differences:
+Both implementations were measured using wall-clock time, but their timing boundaries differ:
 
-1. The reference implementation reports CPU time measured with `clock()`, while DB-LSH-IM uses elapsed-time clocks (`omp_get_wtime()`). CPU time and elapsed wall time are different measures.
-2. The timing boundaries differ: the DB-LSH-IM build timer includes coefficient generation, projections, and tree construction but excludes dataset loading, and its query timer includes the query loop and in-loop metric calculations.
+1. The DB-LSH-IM build timer includes coefficient generation, projections, and tree construction but excludes dataset loading; its query timer includes the query loop and in-loop metric calculations.
+2. The original implementation's timing boundaries encompass the hash configuration and index construction for indexing time, and the hash and search operations for query time.
 
-The query speedups and reductions in Tables 2 and 3 are therefore recorded timings under the stated protocol, not algorithm-level speedups, and the indexing-time differences may partly reflect the timer boundaries.
+Although both measurements target the same phases, the internal operations included in each timing interval are not necessarily identical. The timing reductions in Tables 3 and 4 are therefore recorded timings under the stated protocol, not algorithm-level speedups.
+
+Both implementations are deterministic under the fixed seed and single-thread configuration; the standard deviations across the 20 repetitions reflect system-level timing variability (OS scheduling, cache state, and thermal effects) rather than algorithmic variance.
 
 Small Recall@50 differences were observed consistently across the 20 repetitions, with DB-LSH-IM higher by 0.0060–0.0080 on all three datasets. Their cause was not investigated and cannot be attributed to a specific implementation detail. Differences in data structures and traversal order can change the candidates examined and the results returned; similar aggregate cost and round counts do not establish that the two implementations examined identical candidate sets.
 
@@ -192,6 +216,14 @@ make clean      # removes object files and the executable
 
 The data file is resolved from the first existing path among `data/<dataset>.data_new`, `../dataset/<dataset>.data_new`, and `<dataset>.data_new`.
 
+### Exact invocations used in the reported measurements
+
+```bash
+./dblsh_im audio 1.5 50 5 10 0.1 0.3   --queries 100 --seed 0 --threads 1
+./dblsh_im mnist 1.5 50 5 10 0.1 500   --queries 100 --seed 0 --threads 1
+./dblsh_im sift  1.5 50 5 10 0.1 1.0   --queries 100 --seed 0 --threads 1
+```
+
 ### Example
 
 ```bash
@@ -223,8 +255,8 @@ python3 convert_sift.py
 
 | Measure | Definition |
 |---|---|
-| Indexing time | Reported index-construction time |
-| Query time | Reported query-phase time per evaluated query |
+| Indexing time | Reported index-construction time (wall-clock) |
+| Query time | Reported query-phase time per evaluated query (wall-clock) |
 | Recall@50 | Proportion of exact top-50 IDs recovered |
 | Distance ratio | Comparison of returned and exact-neighbor distances (rank by rank; 1.0 when the exact distance at a rank is zero) |
 | Cost | Unique candidates examined divided by indexed dataset size |
