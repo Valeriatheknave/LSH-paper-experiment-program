@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace dblsh2 {
+namespace dblsh_im {
 
 // ---------------------------------------------------------------------------
 // Data
@@ -46,7 +46,7 @@ Dataset load_dataset(const std::string& path, int requested_queries);
 struct Options {
     std::string dataset_name = "audio";
     std::string data_path;
-    std::string output_csv = "results/DB-LSH2_result.csv";
+    std::string output_csv = "results/DB-LSH-IM_result.csv";
     float c = 1.5f;         // c-ANN approximation ratio
     int k = 50;             // returned neighbours
     int L = 5;              // number of hash tables
@@ -179,4 +179,4 @@ void append_csv(const Options& options, const Dataset& dataset,
 
 void print_report(const Options& options, const BenchmarkReport& report);
 
-}  // namespace dblsh2
+}  // namespace dblsh_im

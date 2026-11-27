@@ -13,7 +13,7 @@
 #include <random>
 #include <stdexcept>
 
-namespace dblsh2 {
+namespace dblsh_im {
 namespace {
 
 constexpr float kInf = std::numeric_limits<float>::infinity();
@@ -50,7 +50,7 @@ bool load_ground_truth(const Options& options, const Dataset& dataset, int k,
     in.read(reinterpret_cast<char*>(&stored_k), sizeof(stored_k));
     in.read(reinterpret_cast<char*>(&n), sizeof(n));
     in.read(reinterpret_cast<char*>(&dim), sizeof(dim));
-    if (std::strncmp(magic, "DBLSH2GT001", sizeof(magic)) != 0 ||
+    if (std::strncmp(magic, "DBLSHIMGT01", sizeof(magic)) != 0 ||
         fingerprint != dataset_fingerprint(options, dataset) ||
         q != dataset.eval_count || stored_k != k || n != dataset.n ||
         dim != dataset.dim) {
@@ -75,7 +75,7 @@ void save_ground_truth(const Options& options, const Dataset& dataset, int k,
     const uint64_t fingerprint = dataset_fingerprint(options, dataset);
     const int32_t q = dataset.eval_count, stored_k = k;
     const int32_t n = dataset.n, dim = dataset.dim;
-    out.write("DBLSH2GT001", 12);
+    out.write("DBLSHIMGT01", 12);
     out.write(reinterpret_cast<const char*>(&fingerprint), sizeof(fingerprint));
     out.write(reinterpret_cast<const char*>(&q), sizeof(q));
     out.write(reinterpret_cast<const char*>(&stored_k), sizeof(stored_k));
@@ -656,4 +656,4 @@ void print_report(const Options& options, const BenchmarkReport& report) {
     }
 }
 
-}  // namespace dblsh2
+}  // namespace dblsh_im

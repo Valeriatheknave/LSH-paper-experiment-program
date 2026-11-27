@@ -1,8 +1,8 @@
 import struct
 from pathlib import Path
 
-ROOT = Path.home() / "myprojects/db_lsh_test/sift_download/sift"
-OUT = Path.home() / "myprojects/db_lsh_test/sift_download"
+ROOT = Path("data/sift_download/sift")
+OUT = Path("data/sift_download")
 
 DIM = 128
 BASE_COUNT = 100_000

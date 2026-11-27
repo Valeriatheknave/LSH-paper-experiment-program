@@ -13,7 +13,7 @@ namespace {
 
 void usage(const char* program) {
     std::cout
-        << "DB-LSH2 - faster, memory-friendly DB-LSH (same c-ANN algorithm)\n\n"
+        << "DB-LSH-IM - in-memory DB-LSH (same c-ANN algorithm)\n\n"
         << "Usage:\n"
         << "  " << program
         << " <dataset> [c k L K beta R_min] [options]\n\n"
@@ -31,7 +31,7 @@ void usage(const char* program) {
         << "  --seed N        RNG seed; 0 matches the original hashes     [0]\n"
         << "  --threads N     OpenMP threads, 0 = all available           [0]\n"
         << "  --leaf N        kd-tree leaf size                           [128]\n"
-        << "  --out PATH      benchmark CSV path       [results/DB-LSH2_result.csv]\n"
+        << "  --out PATH      benchmark CSV path       [results/DB-LSH-IM_result.csv]\n"
         << "  --no-gt         skip exact ground truth (faster, no recall)\n"
         << "  --refresh-gt    recompute ground truth instead of using the cache\n"
         << "  --quiet         suppress configuration printout\n"
@@ -81,7 +81,7 @@ T parse_number(const std::string& value, const std::string& flag) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    using namespace dblsh2;
+    using namespace dblsh_im;
     try {
         Options options;
         std::vector<std::string> positional;
@@ -144,7 +144,7 @@ int main(int argc, char** argv) {
         }
 
         if (!options.quiet) {
-            std::cout << "DB-LSH2 | dataset=" << options.dataset_name
+            std::cout << "DB-LSH-IM | dataset=" << options.dataset_name
                       << " c=" << options.c << " k=" << options.k
                       << " L=" << options.L << " K=" << options.K
                       << " beta=" << options.beta << " R_min=" << options.r_min

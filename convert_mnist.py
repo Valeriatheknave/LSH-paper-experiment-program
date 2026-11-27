@@ -2,8 +2,8 @@ import gzip
 import struct
 import numpy as np
 
-source = "/home/fed/myprojects/datasets/mnist_raw/train-images-idx3-ubyte.gz"
-output = "/home/fed/myprojects/datasets/mnist.data_new"
+source = "data/mnist_raw/train-images-idx3-ubyte.gz"
+output = "data/mnist.data_new"
 
 print("Reading MNIST IDX images...")
 
